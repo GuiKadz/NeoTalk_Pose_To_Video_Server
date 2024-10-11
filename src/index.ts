@@ -1,7 +1,110 @@
-import { Elysia } from "elysia";
+import fs from "fs";
+import path from "path";
 
-const app = new Elysia().get("/", () => "Hello Elysia").listen(3000);
+interface PoseData {
+  [part: string]: {
+    [frame: string]: {
+      [key: string]: {
+        x: number;
+        y: number;
+        z: number;
+      };
+    };
+  };
+}
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-);
+// Função para garantir que o diretório existe
+const ensureDirectoryExistence = (filePath: string): void => {
+  const dirname = path.dirname(filePath);
+  if (!fs.existsSync(dirname)) {
+    fs.mkdirSync(dirname, { recursive: true });
+  }
+};
+
+// Função para processar e salvar os frames incrementalmente em arquivo .json
+const processPoseFile = (filePath: string, jsonFilePath: string): PoseData => {
+  const fileBuffer = fs.readFileSync(filePath);
+  const fileText = fileBuffer.toString("utf8");
+  const lines = fileText.split("\n");
+
+  ensureDirectoryExistence(jsonFilePath);
+
+  const poseData: PoseData = {};
+  let currentPart = ""; // Parte do corpo atual
+  let currentFrame = ""; // Frame atual
+
+  lines.forEach((line) => {
+    line = line.trim();
+
+    // Verifica se a linha começa com #
+    if (line.startsWith("#")) {
+      const match = line.match(/#.*- (.*)/); // Captura a parte do corpo após o '-'
+      if (match) {
+        currentPart = match[1].trim(); // Atualiza a parte do corpo atual
+        poseData[currentPart] = {}; // Inicializa a entrada para essa parte no objeto PoseData
+      }
+    } else if (line !== "" && currentPart) {
+      // Verifica o frame baseado na chave que começa com 'distancia_'
+      if (line.includes("distancia_")) {
+        currentFrame = line.split(":")[0].trim(); // Captura o identificador do frame
+      }
+
+      // Processa as linhas de dados de coordenadas
+      const [key, values] = line.split(":");
+      if (values) {
+        const [x, y, z] = values
+          .trim()
+          .split(" ")
+          .map((value) => parseFloat(value));
+
+        // Adiciona as coordenadas sob a parte do corpo atual e o frame
+        if (!poseData[currentPart][currentFrame]) {
+          poseData[currentPart][currentFrame] = {}; // Inicializa o frame, caso não exista
+        }
+
+        poseData[currentPart][currentFrame][key.trim()] = { x, y, z };
+      }
+    }
+  });
+
+  // Escreve os dados formatados no arquivo JSON
+  fs.writeFileSync(jsonFilePath, JSON.stringify(poseData, null, 2));
+
+  return poseData;
+};
+
+// Servidor Bun para receber o upload e retornar o arquivo .json
+const server = Bun.serve({
+  port: 4000,
+  async fetch(req) {
+    const url = new URL(req.url);
+
+    if (url.pathname === "/upload" && req.method === "POST") {
+      const formdata = await req.formData();
+      const file = formdata.get("pose");
+      
+      if (!file) {
+        return new Response("No file uploaded", { status: 400 });
+      }
+
+      const hash = crypto.randomUUID();
+      const filePath = `./uploads/${hash}.pose`;
+      const jsonFilePath = `./uploads/${hash}.json`;
+
+      // Escreve o arquivo .pose no disco
+      await Bun.write(filePath, file);
+
+      // Processa o arquivo e salva os frames no arquivo .json
+      const formatedData = processPoseFile(filePath, jsonFilePath);
+
+      // Lê o arquivo .json e retorna como resposta
+      const jsonFileBuffer = fs.readFileSync(jsonFilePath);
+
+      return new Response(jsonFileBuffer, {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response("Not Found", { status: 404 });
+  },
+});

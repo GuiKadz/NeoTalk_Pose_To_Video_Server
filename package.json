@@ -6,9 +6,11 @@
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "elysia": "latest",
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
+    "@types/multer": "^1.4.12",
     "bun-types": "latest"
   },
   "module": "src/index.js"
