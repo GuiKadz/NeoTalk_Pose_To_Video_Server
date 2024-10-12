@@ -26,7 +26,7 @@ const processPoseFile = (filePath: string, jsonFilePath: string): PoseData => {
   const fileBuffer = fs.readFileSync(filePath);
   const fileText = fileBuffer.toString("utf8");
   const lines = fileText.split("\n");
-  console.log(lines.length);
+  
   ensureDirectoryExistence(jsonFilePath);
 
   const poseData: PoseData = {};
@@ -37,28 +37,24 @@ const processPoseFile = (filePath: string, jsonFilePath: string): PoseData => {
     line = line.trim();
 
     if (line.startsWith("#")) {
-      console.log("Linha com '#':", line); // Log da linha com '#'
       
-      const partBodyMatch = RegExp(/# Frame: .*? - (.*)/).exec(line); // Regex para capturar a parte do corpo
-  if (partBodyMatch) {
-    currentPart = partBodyMatch[1].trim(); // Atualiza a parte do corpo atual
-    if (!poseData[currentPart]) {
-      poseData[currentPart] = {}; // Inicializa a entrada para essa parte no objeto PoseData
-    }
-  }
-  
-  // Verifica se a linha contém "distância_" para identificar o frame
-  const frameMatch = line.match(/distância_\d{12}/);
-  
-  if (frameMatch) {
-    currentFrame = frameMatch[0].trim(); // Atualiza o identificador do frame atual
-    console.log("Frame atualizado:", currentFrame); // Log do frame atualizado
-  } else {
-    console.log("Nenhum frame encontrado na linha:", line); // Log quando não encontrar frame
-  }
-    } else if (line !== "" && currentPart && currentFrame) {
-      //console.log("Linha atual:", line); // Log da linha atual
 
+      const partBodyMatch = RegExp(/# Frame: .*? - (.*)/).exec(line); // Regex para capturar a parte do corpo
+      if (partBodyMatch) {
+        currentPart = partBodyMatch[1].trim(); // Atualiza a parte do corpo atual
+        if (!poseData[currentPart]) {
+          poseData[currentPart] = {}; // Inicializa a entrada para essa parte no objeto PoseData
+        }
+      }
+
+      // Verifica se a linha contém "distância_" para identificar o frame
+      const frameMatch = line.match(/distância_\d{12}/);
+
+      if (frameMatch) {
+        currentFrame = frameMatch[0].trim(); // Atualiza o identificador do frame atual
+      
+      }
+    } else if (line !== "" && currentPart && currentFrame) {
 
       // Processa as linhas de dados de coordenadas
       const [key, values] = line.split(":");
@@ -110,7 +106,8 @@ const server = Bun.serve({
 
       // Lê o arquivo .json e retorna como resposta
       const jsonFileBuffer = fs.readFileSync(jsonFilePath);
-
+      fs.unlinkSync(filePath);
+      fs.unlinkSync(jsonFilePath);
       return new Response(jsonFileBuffer, {
         headers: { "Content-Type": "application/json" },
       });
