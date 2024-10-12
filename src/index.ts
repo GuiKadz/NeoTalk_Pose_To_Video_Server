@@ -26,7 +26,7 @@ const processPoseFile = (filePath: string, jsonFilePath: string): PoseData => {
   const fileBuffer = fs.readFileSync(filePath);
   const fileText = fileBuffer.toString("utf8");
   const lines = fileText.split("\n");
-
+  console.log(lines.length);
   ensureDirectoryExistence(jsonFilePath);
 
   const poseData: PoseData = {};
@@ -36,18 +36,29 @@ const processPoseFile = (filePath: string, jsonFilePath: string): PoseData => {
   lines.forEach((line) => {
     line = line.trim();
 
-    // Verifica se a linha começa com #
     if (line.startsWith("#")) {
-      const match = line.match(/#.*- (.*)/); // Captura a parte do corpo após o '-'
-      if (match) {
-        currentPart = match[1].trim(); // Atualiza a parte do corpo atual
-        poseData[currentPart] = {}; // Inicializa a entrada para essa parte no objeto PoseData
-      }
-    } else if (line !== "" && currentPart) {
-      // Verifica o frame baseado na chave que começa com 'distancia_'
-      if (line.includes("distancia_")) {
-        currentFrame = line.split(":")[0].trim(); // Captura o identificador do frame
-      }
+      console.log("Linha com '#':", line); // Log da linha com '#'
+      
+      const partBodyMatch = RegExp(/# Frame: .*? - (.*)/).exec(line); // Regex para capturar a parte do corpo
+  if (partBodyMatch) {
+    currentPart = partBodyMatch[1].trim(); // Atualiza a parte do corpo atual
+    if (!poseData[currentPart]) {
+      poseData[currentPart] = {}; // Inicializa a entrada para essa parte no objeto PoseData
+    }
+  }
+  
+  // Verifica se a linha contém "distância_" para identificar o frame
+  const frameMatch = line.match(/distância_\d{12}/);
+  
+  if (frameMatch) {
+    currentFrame = frameMatch[0].trim(); // Atualiza o identificador do frame atual
+    console.log("Frame atualizado:", currentFrame); // Log do frame atualizado
+  } else {
+    console.log("Nenhum frame encontrado na linha:", line); // Log quando não encontrar frame
+  }
+    } else if (line !== "" && currentPart && currentFrame) {
+      //console.log("Linha atual:", line); // Log da linha atual
+
 
       // Processa as linhas de dados de coordenadas
       const [key, values] = line.split(":");
@@ -82,7 +93,7 @@ const server = Bun.serve({
     if (url.pathname === "/upload" && req.method === "POST") {
       const formdata = await req.formData();
       const file = formdata.get("pose");
-      
+
       if (!file) {
         return new Response("No file uploaded", { status: 400 });
       }
