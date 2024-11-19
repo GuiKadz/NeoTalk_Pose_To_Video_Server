@@ -82,20 +82,16 @@ const ensureDirectoryExistence = (filePath: string): void => {
 const processPoseFile = (filePath: string, jsonFilePath: string): void => {
   const fileBuffer = fs.readFileSync(filePath);
   let fileText = fileBuffer.toString("utf8");
-
-  // Substituir aspas simples por aspas duplas, se necessário
-  fileText = fileText.replace(/'/g, '"');
-
-  // Limpar e processar linhas que contêm 'np.float64'
+  
   const cleanKeypoints = fileText
+    .replace(/'/g, '"')
     .replace(/np\.float(?:32|64)\(([-\d.]+)\)/g, "$1") // Extrair o valor numérico
-    .replace(/[\[\]]/g, "") // Remover colchetes
+    .replace(/[[\]]/g, "") // Remover colchetes
     .replace(/,/g, "")
     .replace(/(body|left_hand|right_hand|face)/g, "")
     .replace(/"/g, "")
     .replace(/["{:]/g, "") // Remover textos desnecessários
     .trim(); // Remover espaços no início e fim
-  console.log(cleanKeypoints);
 
   const lines = cleanKeypoints.split("\n").filter(Boolean); // Remover linhas vazias
 
@@ -130,13 +126,13 @@ const processPoseFile = (filePath: string, jsonFilePath: string): void => {
     const offsetHand = BODY_KEYPOINTS_ORDER.length;
     HAND_KEYPOINTS_ORDER.forEach((keypoint, i) => {
       const [x, y, z] = groups[offsetHand + i] || [0, 0, 0];
-      frameData.left_hand[keypoint] = { x, y, z };
+      frameData.left_hand[`L${keypoint}`] = { x, y, z };
     });
 
     const offsetRightHand = offsetHand + HAND_KEYPOINTS_ORDER.length;
     HAND_KEYPOINTS_ORDER.forEach((keypoint, i) => {
       const [x, y, z] = groups[offsetRightHand + i] || [0, 0, 0];
-      frameData.right_hand[keypoint] = { x, y, z };
+      frameData.right_hand[`R${keypoint}`] = { x, y, z };
     });
 
     const offsetFace = offsetRightHand + HAND_KEYPOINTS_ORDER.length;
@@ -155,8 +151,8 @@ const processPoseFile = (filePath: string, jsonFilePath: string): void => {
 const CACHE_DIR = "./tmp"; // Diretório de cache
 
 // Middleware para criar o diretório temporário, se não existir
-
 mkdirSync(CACHE_DIR, { recursive: true });
+
 // Servidor Bun para receber o upload e retornar o json
 const server = Bun.serve({
   port: 4000,
